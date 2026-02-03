@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title></title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[34.30027360712049,-13.800968822925546],[43.60091321938012,9.731796076228695]]);
+var osm = L.tileLayer(
+    		'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    		{
+        	attribution: '&copy; OpenStreetMap contributors',
+        	maxZoom: 19
+    		}
+		);
+
+	osm.addTo(map);
+	
+var osmLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors',
+    pane: 'shadowPane', // Esto las sitúa por encima de los marcadores
+    zIndex: 1000
+}).addTo(map);
+
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_1996_0');
+        map.getPane('pane_1996_0').style.zIndex = 400;
+        var img_1996_0 = 'data/1996_0.png';
+        var img_bounds_1996_0 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_1996_0 = new L.imageOverlay(img_1996_0,
+                                              img_bounds_1996_0,
+                                              {pane: 'pane_1996_0'});
+        bounds_group.addLayer(layer_1996_0);
+        map.addLayer(layer_1996_0);
+        map.createPane('pane_1997_1');
+        map.getPane('pane_1997_1').style.zIndex = 401;
+        var img_1997_1 = 'data/1997_1.png';
+        var img_bounds_1997_1 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_1997_1 = new L.imageOverlay(img_1997_1,
+                                              img_bounds_1997_1,
+                                              {pane: 'pane_1997_1'});
+        bounds_group.addLayer(layer_1997_1);
+        map.addLayer(layer_1997_1);
+        map.createPane('pane_1998_2');
+        map.getPane('pane_1998_2').style.zIndex = 402;
+        var img_1998_2 = 'data/1998_2.png';
+        var img_bounds_1998_2 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_1998_2 = new L.imageOverlay(img_1998_2,
+                                              img_bounds_1998_2,
+                                              {pane: 'pane_1998_2'});
+        bounds_group.addLayer(layer_1998_2);
+        map.addLayer(layer_1998_2);
+        map.createPane('pane_1999_3');
+        map.getPane('pane_1999_3').style.zIndex = 403;
+        var img_1999_3 = 'data/1999_3.png';
+        var img_bounds_1999_3 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_1999_3 = new L.imageOverlay(img_1999_3,
+                                              img_bounds_1999_3,
+                                              {pane: 'pane_1999_3'});
+        bounds_group.addLayer(layer_1999_3);
+        map.addLayer(layer_1999_3);
+        map.createPane('pane_2000_4');
+        map.getPane('pane_2000_4').style.zIndex = 404;
+        var img_2000_4 = 'data/2000_4.png';
+        var img_bounds_2000_4 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2000_4 = new L.imageOverlay(img_2000_4,
+                                              img_bounds_2000_4,
+                                              {pane: 'pane_2000_4'});
+        bounds_group.addLayer(layer_2000_4);
+        map.addLayer(layer_2000_4);
+        map.createPane('pane_2001_5');
+        map.getPane('pane_2001_5').style.zIndex = 405;
+        var img_2001_5 = 'data/2001_5.png';
+        var img_bounds_2001_5 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2001_5 = new L.imageOverlay(img_2001_5,
+                                              img_bounds_2001_5,
+                                              {pane: 'pane_2001_5'});
+        bounds_group.addLayer(layer_2001_5);
+        map.addLayer(layer_2001_5);
+        map.createPane('pane_2002_6');
+        map.getPane('pane_2002_6').style.zIndex = 406;
+        var img_2002_6 = 'data/2002_6.png';
+        var img_bounds_2002_6 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2002_6 = new L.imageOverlay(img_2002_6,
+                                              img_bounds_2002_6,
+                                              {pane: 'pane_2002_6'});
+        bounds_group.addLayer(layer_2002_6);
+        map.addLayer(layer_2002_6);
+        map.createPane('pane_2003_7');
+        map.getPane('pane_2003_7').style.zIndex = 407;
+        var img_2003_7 = 'data/2003_7.png';
+        var img_bounds_2003_7 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2003_7 = new L.imageOverlay(img_2003_7,
+                                              img_bounds_2003_7,
+                                              {pane: 'pane_2003_7'});
+        bounds_group.addLayer(layer_2003_7);
+        map.addLayer(layer_2003_7);
+        map.createPane('pane_2004_8');
+        map.getPane('pane_2004_8').style.zIndex = 408;
+        var img_2004_8 = 'data/2004_8.png';
+        var img_bounds_2004_8 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2004_8 = new L.imageOverlay(img_2004_8,
+                                              img_bounds_2004_8,
+                                              {pane: 'pane_2004_8'});
+        bounds_group.addLayer(layer_2004_8);
+        map.addLayer(layer_2004_8);
+        map.createPane('pane_2005_9');
+        map.getPane('pane_2005_9').style.zIndex = 409;
+        var img_2005_9 = 'data/2005_9.png';
+        var img_bounds_2005_9 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2005_9 = new L.imageOverlay(img_2005_9,
+                                              img_bounds_2005_9,
+                                              {pane: 'pane_2005_9'});
+        bounds_group.addLayer(layer_2005_9);
+        map.addLayer(layer_2005_9);
+        map.createPane('pane_2006_10');
+        map.getPane('pane_2006_10').style.zIndex = 410;
+        var img_2006_10 = 'data/2006_10.png';
+        var img_bounds_2006_10 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2006_10 = new L.imageOverlay(img_2006_10,
+                                              img_bounds_2006_10,
+                                              {pane: 'pane_2006_10'});
+        bounds_group.addLayer(layer_2006_10);
+        map.addLayer(layer_2006_10);
+        map.createPane('pane_2007_11');
+        map.getPane('pane_2007_11').style.zIndex = 411;
+        var img_2007_11 = 'data/2007_11.png';
+        var img_bounds_2007_11 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2007_11 = new L.imageOverlay(img_2007_11,
+                                              img_bounds_2007_11,
+                                              {pane: 'pane_2007_11'});
+        bounds_group.addLayer(layer_2007_11);
+        map.addLayer(layer_2007_11);
+        map.createPane('pane_2008_12');
+        map.getPane('pane_2008_12').style.zIndex = 412;
+        var img_2008_12 = 'data/2008_12.png';
+        var img_bounds_2008_12 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2008_12 = new L.imageOverlay(img_2008_12,
+                                              img_bounds_2008_12,
+                                              {pane: 'pane_2008_12'});
+        bounds_group.addLayer(layer_2008_12);
+        map.addLayer(layer_2008_12);
+        map.createPane('pane_2009_13');
+        map.getPane('pane_2009_13').style.zIndex = 413;
+        var img_2009_13 = 'data/2009_13.png';
+        var img_bounds_2009_13 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2009_13 = new L.imageOverlay(img_2009_13,
+                                              img_bounds_2009_13,
+                                              {pane: 'pane_2009_13'});
+        bounds_group.addLayer(layer_2009_13);
+        map.addLayer(layer_2009_13);
+        map.createPane('pane_2010_14');
+        map.getPane('pane_2010_14').style.zIndex = 414;
+        var img_2010_14 = 'data/2010_14.png';
+        var img_bounds_2010_14 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2010_14 = new L.imageOverlay(img_2010_14,
+                                              img_bounds_2010_14,
+                                              {pane: 'pane_2010_14'});
+        bounds_group.addLayer(layer_2010_14);
+        map.addLayer(layer_2010_14);
+        map.createPane('pane_2011_15');
+        map.getPane('pane_2011_15').style.zIndex = 415;
+        var img_2011_15 = 'data/2011_15.png';
+        var img_bounds_2011_15 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2011_15 = new L.imageOverlay(img_2011_15,
+                                              img_bounds_2011_15,
+                                              {pane: 'pane_2011_15'});
+        bounds_group.addLayer(layer_2011_15);
+        map.addLayer(layer_2011_15);
+        map.createPane('pane_2012_16');
+        map.getPane('pane_2012_16').style.zIndex = 416;
+        var img_2012_16 = 'data/2012_16.png';
+        var img_bounds_2012_16 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2012_16 = new L.imageOverlay(img_2012_16,
+                                              img_bounds_2012_16,
+                                              {pane: 'pane_2012_16'});
+        bounds_group.addLayer(layer_2012_16);
+        map.addLayer(layer_2012_16);
+        map.createPane('pane_2013_17');
+        map.getPane('pane_2013_17').style.zIndex = 417;
+        var img_2013_17 = 'data/2013_17.png';
+        var img_bounds_2013_17 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2013_17 = new L.imageOverlay(img_2013_17,
+                                              img_bounds_2013_17,
+                                              {pane: 'pane_2013_17'});
+        bounds_group.addLayer(layer_2013_17);
+        map.addLayer(layer_2013_17);
+        map.createPane('pane_2014_18');
+        map.getPane('pane_2014_18').style.zIndex = 418;
+        var img_2014_18 = 'data/2014_18.png';
+        var img_bounds_2014_18 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2014_18 = new L.imageOverlay(img_2014_18,
+                                              img_bounds_2014_18,
+                                              {pane: 'pane_2014_18'});
+        bounds_group.addLayer(layer_2014_18);
+        map.addLayer(layer_2014_18);
+        map.createPane('pane_2015_19');
+        map.getPane('pane_2015_19').style.zIndex = 419;
+        var img_2015_19 = 'data/2015_19.png';
+        var img_bounds_2015_19 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2015_19 = new L.imageOverlay(img_2015_19,
+                                              img_bounds_2015_19,
+                                              {pane: 'pane_2015_19'});
+        bounds_group.addLayer(layer_2015_19);
+        map.addLayer(layer_2015_19);
+        map.createPane('pane_2016_20');
+        map.getPane('pane_2016_20').style.zIndex = 420;
+        var img_2016_20 = 'data/2016_20.png';
+        var img_bounds_2016_20 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2016_20 = new L.imageOverlay(img_2016_20,
+                                              img_bounds_2016_20,
+                                              {pane: 'pane_2016_20'});
+        bounds_group.addLayer(layer_2016_20);
+        map.addLayer(layer_2016_20);
+        map.createPane('pane_2017_21');
+        map.getPane('pane_2017_21').style.zIndex = 421;
+        var img_2017_21 = 'data/2017_21.png';
+        var img_bounds_2017_21 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2017_21 = new L.imageOverlay(img_2017_21,
+                                              img_bounds_2017_21,
+                                              {pane: 'pane_2017_21'});
+        bounds_group.addLayer(layer_2017_21);
+        map.addLayer(layer_2017_21);
+        map.createPane('pane_2018_22');
+        map.getPane('pane_2018_22').style.zIndex = 422;
+        var img_2018_22 = 'data/2018_22.png';
+        var img_bounds_2018_22 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2018_22 = new L.imageOverlay(img_2018_22,
+                                              img_bounds_2018_22,
+                                              {pane: 'pane_2018_22'});
+        bounds_group.addLayer(layer_2018_22);
+        map.addLayer(layer_2018_22);
+        map.createPane('pane_2019_23');
+        map.getPane('pane_2019_23').style.zIndex = 423;
+        var img_2019_23 = 'data/2019_23.png';
+        var img_bounds_2019_23 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2019_23 = new L.imageOverlay(img_2019_23,
+                                              img_bounds_2019_23,
+                                              {pane: 'pane_2019_23'});
+        bounds_group.addLayer(layer_2019_23);
+        map.addLayer(layer_2019_23);
+        map.createPane('pane_2020_24');
+        map.getPane('pane_2020_24').style.zIndex = 424;
+        var img_2020_24 = 'data/2020_24.png';
+        var img_bounds_2020_24 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2020_24 = new L.imageOverlay(img_2020_24,
+                                              img_bounds_2020_24,
+                                              {pane: 'pane_2020_24'});
+        bounds_group.addLayer(layer_2020_24);
+        map.addLayer(layer_2020_24);
+        map.createPane('pane_2021_25');
+        map.getPane('pane_2021_25').style.zIndex = 425;
+        var img_2021_25 = 'data/2021_25.png';
+        var img_bounds_2021_25 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2021_25 = new L.imageOverlay(img_2021_25,
+                                              img_bounds_2021_25,
+                                              {pane: 'pane_2021_25'});
+        bounds_group.addLayer(layer_2021_25);
+        map.addLayer(layer_2021_25);
+        map.createPane('pane_2022_26');
+        map.getPane('pane_2022_26').style.zIndex = 426;
+        var img_2022_26 = 'data/2022_26.png';
+        var img_bounds_2022_26 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2022_26 = new L.imageOverlay(img_2022_26,
+                                              img_bounds_2022_26,
+                                              {pane: 'pane_2022_26'});
+        bounds_group.addLayer(layer_2022_26);
+        map.addLayer(layer_2022_26);
+        map.createPane('pane_2023_27');
+        map.getPane('pane_2023_27').style.zIndex = 427;
+        var img_2023_27 = 'data/2023_27.png';
+        var img_bounds_2023_27 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2023_27 = new L.imageOverlay(img_2023_27,
+                                              img_bounds_2023_27,
+                                              {pane: 'pane_2023_27'});
+        bounds_group.addLayer(layer_2023_27);
+        map.addLayer(layer_2023_27);
+        map.createPane('pane_2024_28');
+        map.getPane('pane_2024_28').style.zIndex = 428;
+        var img_2024_28 = 'data/2024_28.png';
+        var img_bounds_2024_28 = [[27.485435179139373,-21.247945225428918],[43.88560879763062,4.762677413702979]];
+        var layer_2024_28 = new L.imageOverlay(img_2024_28,
+                                              img_bounds_2024_28,
+                                              {pane: 'pane_2024_28'});
+        bounds_group.addLayer(layer_2024_28);
+        map.addLayer(layer_2024_28);
+        const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
+        "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
+        var photonControl = L.control.photon({
+            url: url["Nominatim OSM"],
+            feedbackLabel: '',
+            position: 'topleft',
+            includePosition: true,
+            initial: true,
+            // resultsHandler: myHandler,
+        }).addTo(map);
+        photonControl._container.childNodes[0].style.borderRadius="10px"
+        // Create a variable to store the geoJSON data
+        var x = null;
+        // Create a variable to store the marker
+        var marker = null;
+        // Add an event listener to the Photon control to create a marker from the returned geoJSON data
+        var z = null;
+        photonControl.on('selected', function(e) {
+            console.log(photonControl.search.resultsContainer);
+            if (x != null) {
+                map.removeLayer(obj3.marker);
+                map.removeLayer(x);
+            }
+            obj2.gcd = e.choice;
+            x = L.geoJSON(obj2.gcd).addTo(map);
+            var label = typeof obj2.gcd.properties.label === 'undefined' ? obj2.gcd.properties.display_name : obj2.gcd.properties.label;
+            obj3.marker = L.marker(x.getLayers()[0].getLatLng()).bindPopup(label).addTo(map);
+            map.setView(x.getLayers()[0].getLatLng(), 17);
+            z = typeof e.choice.properties.label === 'undefined'? e.choice.properties.display_name : e.choice.properties.label;
+            console.log(e);
+            e.target.input.value = z;
+        });
+        var search = document.getElementsByClassName("leaflet-photon leaflet-control")[0];
+        search.classList.add("leaflet-control-search")
+        search.style.display = "flex";
+        search.style.backgroundColor="rgba(255,255,255,0.5)" 
+
+        // Create the new button element
+        var button = document.createElement("div");
+        button.id = "gcd-button-control";
+        button.className = "gcd-gl-btn fa fa-search search-button";
+
+        // Insert the button at the beginning of the search control
+        search.insertBefore(button, search.firstChild);
+        last = search.lastChild;
+        last.style.display = "none";
+        button.addEventListener("click", function (e) {
+            if (last.style.display === "none") {
+                last.style.display = "block";
+            } else {
+                last.style.display = "none";
+            }
+        });
+        var overlaysTree = [
+        {label: '<b>5-100KW</b>',  selectAllCheckbox: true, children: [
+            {label: "2024", layer: layer_2024_28},
+            {label: "2023", layer: layer_2023_27},
+            {label: "2022", layer: layer_2022_26},
+            {label: "2021", layer: layer_2021_25},
+            {label: "2020", layer: layer_2020_24},
+            {label: "2019", layer: layer_2019_23},
+            {label: "2018", layer: layer_2018_22},
+            {label: "2017", layer: layer_2017_21},
+            {label: "2016", layer: layer_2016_20},
+            {label: "2015", layer: layer_2015_19},
+            {label: "2014", layer: layer_2014_18},
+            {label: "2013", layer: layer_2013_17},
+            {label: "2012", layer: layer_2012_16},
+            {label: "2011", layer: layer_2011_15},
+            {label: "2010", layer: layer_2010_14},
+            {label: "2009", layer: layer_2009_13},
+            {label: "2008", layer: layer_2008_12},
+            {label: "2007", layer: layer_2007_11},
+            {label: "2006", layer: layer_2006_10},
+            {label: "2005", layer: layer_2005_9},
+            {label: "2004", layer: layer_2004_8},
+            {label: "2003", layer: layer_2003_7},
+            {label: "2002", layer: layer_2002_6},
+            {label: "2001", layer: layer_2001_5},
+            {label: "2000", layer: layer_2000_4},
+            {label: "1999", layer: layer_1999_3},
+            {label: "1998", layer: layer_1998_2},
+            {label: "1997", layer: layer_1997_1},
+            {label: "1996", layer: layer_1996_0},]},]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: false, 
+        });
+        lay.addTo(map);
+		document.addEventListener("DOMContentLoaded", function() {
+            // set new Layers List height which considers toggle icon
+            function newLayersListHeight() {
+                var layerScrollbarElement = document.querySelector('.leaflet-control-layers-scrollbar');
+                if (layerScrollbarElement) {
+                    var layersListElement = document.querySelector('.leaflet-control-layers-list');
+                    var originalHeight = layersListElement.style.height 
+                        || window.getComputedStyle(layersListElement).height;
+                    var newHeight = parseFloat(originalHeight) - 50;
+                    layersListElement.style.height = newHeight + 'px';
+                }
+            }
+            var isLayersListExpanded = true;
+            var controlLayersElement = document.querySelector('.leaflet-control-layers');
+            var toggleLayerControl = document.querySelector('.leaflet-control-layers-toggle');
+            // toggle Collapsed/Expanded and apply new Layers List height
+            toggleLayerControl.addEventListener('click', function() {
+                if (isLayersListExpanded) {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                } else {
+                    controlLayersElement.classList.add('leaflet-control-layers-expanded');
+                }
+                isLayersListExpanded = !isLayersListExpanded;
+                newLayersListHeight()
+            });	
+			// apply new Layers List height if toggle layerstree
+			if (controlLayersElement) {
+				controlLayersElement.addEventListener('click', function(event) {
+					var toggleLayerHeaderPointer = event.target.closest('.leaflet-layerstree-header-pointer span');
+					if (toggleLayerHeaderPointer) {
+						newLayersListHeight();
+					}
+				});
+			}
+            // Collapsed/Expanded at Start to apply new height
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            // Collapsed touch/small screen
+            var isSmallScreen = window.innerWidth < 650;
+            if (isSmallScreen) {
+                setTimeout(function() {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                    isLayersListExpanded = !isLayersListExpanded;
+                }, 500);
+            }  
+        });       
+        setBounds();
+        L.ImageOverlay.include({
+            getBounds: function () {
+                return this._bounds;
+            }
+        });
+var legend = L.control({ position: 'bottomleft' });
+
+	legend.onAdd = function (map) {
+    	var div = L.DomUtil.create('div', 'legend');
+    	div.innerHTML = '<img src="images/leyenda.png" style="width:150px;">';
+    	return div;
+	};
+legend.addTo(map);
+
+        </script>        
+    </body>
+</html>
