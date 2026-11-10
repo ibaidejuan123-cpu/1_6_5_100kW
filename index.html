@@ -38,18 +38,22 @@
         <script src="js/leaflet.photon.js"></script>
         <script src="js/leaflet-measure.js"></script>
         <script>
-        var map = L.map('map', {
-            zoomControl:false, maxZoom:28, minZoom:1
-        }).fitBounds([[34.30027360712049,-13.800968822925546],[43.60091321938012,9.731796076228695]]);
-var osm = L.tileLayer(
-    		'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    		{
-        	attribution: '&copy; OpenStreetMap contributors',
-        	maxZoom: 19
-    		}
-		);
-
-	osm.addTo(map);
+		var map = L.map('map', {
+    		zoomControl: false,
+    		maxZoom: 28,
+    		minZoom: 1
+		}).fitBounds([
+    		[34.4517317996146,-10.941381390934747],
+    		[44.028175045273564,12.679387416945799]
+		]);
+		// Mapa base OpenStreetMap (sin API Key)
+		var osm = L.tileLayer(
+			'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+			{
+				attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+				maxZoom: 19
+			}
+		).addTo(map);
 	
 var osmLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap contributors',
